@@ -207,6 +207,52 @@ public class EventBus {
 
     }
 
+    public void postSticky(Object event) {
+        synchronized (stickyEvents) {
+            stickyEvents.put(event.getClass(), event);
+        }
+
+        // 这里会马上分发非粘性事件，难受，注销
+        // post(event)
+    }
+
+    public <T> T getStickyEvent(Class<T> eventType) {
+        synchronized (stickyEvents) {
+            return eventType.cast(stickyEvents.get(eventType));
+        }
+    }
+
+    public <T> T removeStickyEvent(Class<T> eventType){
+        synchronized(stickyEvents){
+            return eventType.cast(stickyEvents.remove(eventType));
+        }
+    }
+
+    public void removeAllStickyEvents(){
+        synchronized(stickyEvents){
+            stickyEvents.clear();
+        }
+    }
+
+    public void post(Object event){
+        postSingleEventForEventType(event,event.getClass());
+    }
+
+    private void postSingleEventForEventType(Object event, Class<?> eventClass) {
+
+        CopyOnWriteArrayList<Subscription> subscriptions;
+        synchronized(this){
+            subscriptions = subscriptionsByEventType.get(eventClass);
+        }
+
+        if (subscriptions!=null&&!subscriptions.isEmpty()){
+            for (Subscription subscription : subscriptions) {
+                postToSubscription(subscription,event);
+            }
+        }
+
+    }
+
     private void invokeSubscriber(Subscription subscription, Object event) {
         try {
             subscription.subscriberMethod.getMethod().invoke(subscription.subscriber, event);
